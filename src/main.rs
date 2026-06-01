@@ -75,10 +75,18 @@ impl Editor {
     fn move_cursor(&mut self, press: KeyCode) {
         match press {
             KeyCode::Up => {
-                self.cursor_y = self.cursor_y.saturating_sub(1);
+                if self.cursor_y > 0 {
+                    self.cursor_y = self.cursor_y.saturating_sub(1);
+                } else if self.scroll_y > 0 {
+                    self.scroll_y -= 1;
+                }
             }
             KeyCode::Down => {
-                if self.cursor_y < self.window_height - 2 { self.cursor_y += 1; }
+                if self.cursor_y < self.window_height - 2 { 
+                    self.cursor_y += 1; 
+                } else {
+                    self.scroll_y += 1;
+                }
             }
             KeyCode::Left => {
                 self.cursor_x = self.cursor_x.saturating_sub(1);
