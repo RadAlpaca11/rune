@@ -81,6 +81,10 @@ impl Editor {
                     (code, _) => self.move_cursor(code),
                 }
             }
+            if let Event::Resize(width, height) = event::read()? {
+                self.window_width = width;
+                self.window_height = height;
+            }
         }
         Ok(())
     }
