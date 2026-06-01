@@ -8,10 +8,17 @@ use crossterm::{
 
 use std::io::{self, Write};
 
+
 const COLOR_PRI: Color = Color::White;
 const COLOR_SEC: Color = Color::Black;
 
+enum Mode {
+    Viewing,
+    Insert,
+}
+
 struct Editor {
+    mode: Mode,
     cursor_x: u16,
     cursor_y: u16,
     window_width: u16,
@@ -30,6 +37,7 @@ impl Editor {
             window_height,
             buffer: Vec::new(),
             scroll_y: 0,
+            mode: Mode::Viewing,
         }
     }
 
@@ -42,7 +50,11 @@ impl Editor {
     fn draw(&self, stdout: &mut impl Write) -> io::Result<()> {
         execute!(stdout, terminal::Clear(ClearType::All))?;
         
-        let line_number_width = self.buffer.len().to_string().len() as u16 + 2;
+        let line_number_width: u16 = self.buffer.len().to_string().len() as u16 + 2;
+        let mode_str = match self.mode {
+            Mode::Viewing => "VIEWING",
+            Mode::Insert => "INSERT",
+        };
 
         for row in 0..self.window_height - 1 {
             execute!(stdout, cursor::MoveTo(0, row))?;
@@ -61,13 +73,13 @@ impl Editor {
             SetForegroundColor(COLOR_SEC)
         )?;
 
-        let status = format!("x: {}, y: {}", self.cursor_x, self.cursor_y);
+        let status = format!("x: {}, y: {}  MODE:{}", self.cursor_x, self.cursor_y, mode_str);
         let padding = " ".repeat((self.window_width as usize).saturating_sub(status.len()));
 
         write!(stdout, "{}{}", status, padding)?;
 
         execute!(stdout, ResetColor)?;
-        execute!(stdout, cursor::MoveTo(self.cursor_x, self.cursor_y))?;
+        execute!(stdout, cursor::MoveTo(self.cursor_x + line_number_width - 1, self.cursor_y))?;
         stdout.flush()?;
         Ok(())
     }
@@ -98,6 +110,40 @@ impl Editor {
         }
     }
 
+    fn insert(&mut self, key:KeyCode) {
+        let line_idx = self.cursor_y as usize + self.scroll_y;
+
+        match key {
+            KeyCode::Char(c) => {
+                self.buffer[line_idx].insert(self.cursor_x as usize, c);
+                self.cursor_x += 1;
+            }
+            KeyCode::Enter => {
+                let new_line = self.buffer[line_idx].split_off(self.cursor_x as usize);
+                self.buffer.insert(line_idx + 1, new_line);
+                self.cursor_x = 0;
+                self.cursor_y +=1;
+            }
+            KeyCode::Backspace => {
+                if self.cursor_x > 0 {
+                    self.buffer[line_idx].remove((self.cursor_x - 1) as usize);
+                    self.cursor_x -= 1;
+                } else if line_idx > 0 {
+                    let prev_line_len = self.buffer[line_idx - 1].len() as u16;
+                    let current_line = self.buffer.remove(line_idx);
+                    self.buffer[line_idx - 1].push_str(&current_line);
+                    self.cursor_x = prev_line_len;
+                    self.cursor_y -= 1;
+                }
+            }
+            KeyCode::Tab => {
+                self.buffer[line_idx].insert_str(self.cursor_x as usize, &" ".repeat(4));
+                self.cursor_x += 4;
+            }
+            _ => {}
+        }
+    }
+
     fn run(&mut self, stdout: &mut impl Write) -> io::Result<()> {
         loop {
             self.draw(stdout)?;
@@ -105,7 +151,19 @@ impl Editor {
                 Event::Key(KeyEvent { code, modifiers, .. }) => {
                     match (code, modifiers) {
                         (KeyCode::Char('c'), KeyModifiers::CONTROL) => break,
-                        (code, _) => self.move_cursor(code),
+                        (KeyCode::Esc, KeyModifiers::NONE) => self.mode = Mode::Viewing,
+                        (KeyCode::Char('i'), KeyModifiers::NONE) if matches!(self.mode, Mode::Viewing) => {
+                            self.mode = Mode::Insert;
+                        }
+                        (code, _) => match self.mode {
+                            Mode::Viewing => self.move_cursor(code),
+                            Mode::Insert => {
+                                match code {
+                                    KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right => self.move_cursor(code),
+                                    _ => self.insert(code),
+                                }
+                            }
+                        }
                     }
                 }
                 Event::Resize(width, height) => {
