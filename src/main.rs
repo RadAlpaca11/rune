@@ -11,6 +11,7 @@ use std::io::{self, Write};
 
 const COLOR_PRI: Color = Color::White;
 const COLOR_SEC: Color = Color::Black;
+const COLOR_ERR: Color = Color::Red;
 
 enum Mode {
     Viewing,
@@ -25,25 +26,41 @@ struct Editor {
     window_height: u16,
     buffer: Vec<String>,
     scroll_y: usize,
+    path: String,
+    modified: bool,
 }
 
 impl Editor {
     fn new() -> Self {
         let (window_width, window_height) = terminal::size().unwrap();
         Editor {
+            mode: Mode::Viewing,
             cursor_x: 0,
             cursor_y: 0,
             window_width,
             window_height,
             buffer: Vec::new(),
             scroll_y: 0,
-            mode: Mode::Viewing,
+            path: String::new(),
+            modified: false,
         }
     }
 
     fn load(&mut self, path: &str) -> io::Result<()> {
-        let contents = std::fs::read_to_string(path)?;
-        self.buffer = contents.lines().map(|line: &str| line.to_string()).collect();
+        self.path = path.to_string();
+        if std::path::Path::new(path).exists() {
+            let contents = std::fs::read_to_string(path)?;
+            self.buffer = contents.lines().map(|line: &str| line.to_string()).collect();
+        } else {
+            self.buffer = vec![String::new()];
+        }
+        self.modified = false;
+        Ok(())
+    }
+
+    fn save(&mut self) -> io::Result<()> {
+        std::fs::write(&self.path, self.buffer.join("\n"))?;
+        self.modified = false;
         Ok(())
     }
 
@@ -51,10 +68,6 @@ impl Editor {
         execute!(stdout, terminal::Clear(ClearType::All))?;
         
         let line_number_width: u16 = self.buffer.len().to_string().len() as u16 + 2;
-        let mode_str = match self.mode {
-            Mode::Viewing => "VIEWING",
-            Mode::Insert => "INSERT",
-        };
 
         for row in 0..self.window_height - 1 {
             execute!(stdout, cursor::MoveTo(0, row))?;
@@ -73,7 +86,13 @@ impl Editor {
             SetForegroundColor(COLOR_SEC)
         )?;
 
-        let status = format!("x: {}, y: {}  MODE:{}", self.cursor_x, self.cursor_y, mode_str);
+        let mode_str = match self.mode {
+            Mode::Viewing => "VIEWING",
+            Mode::Insert => "INSERT",
+        };
+        let modified_str = if self.modified { "[+]"} else { "" };
+
+        let status = format!("x: {}, y: {}  MODE:{}  FILE:{}   {}", self.cursor_x, self.cursor_y, mode_str, self.path, modified_str);
         let padding = " ".repeat((self.window_width as usize).saturating_sub(status.len()));
 
         write!(stdout, "{}{}", status, padding)?;
@@ -85,7 +104,6 @@ impl Editor {
     }
 
     fn move_cursor(&mut self, press: KeyCode) {
-
         match press {
             KeyCode::Up => {
                 if self.cursor_y > 0 {
@@ -129,6 +147,7 @@ impl Editor {
 
     fn insert(&mut self, key:KeyCode) {
         let line_idx = self.cursor_y as usize + self.scroll_y;
+        self.modified = true;
 
         match key {
             KeyCode::Char(c) => {
@@ -167,7 +186,11 @@ impl Editor {
             match event::read()? {
                 Event::Key(KeyEvent { code, modifiers, .. }) => {
                     match (code, modifiers) {
-                        (KeyCode::Char('c'), KeyModifiers::CONTROL) => break,
+                        (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                            self.close(stdout)?;
+                            break;
+                        }
+                        (KeyCode::Char('s'), KeyModifiers::CONTROL) => self.save()?,
                         (KeyCode::Esc, KeyModifiers::NONE) => self.mode = Mode::Viewing,
                         (KeyCode::Char('i'), KeyModifiers::NONE) if matches!(self.mode, Mode::Viewing) => {
                             self.mode = Mode::Insert;
@@ -188,6 +211,38 @@ impl Editor {
                     self.window_height = height;
                 }
                 _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn prompt_save(&mut self, stdout: &mut impl Write) -> io::Result<bool> {
+        execute!(
+            stdout,
+            cursor::MoveTo(0, self.window_height - 1),
+            terminal::Clear(ClearType::CurrentLine),
+            SetBackgroundColor(COLOR_ERR),
+            SetForegroundColor(COLOR_PRI),
+        )?;
+        write!(stdout, "UNSAVED CHANGES! Save before exiting? (y/n) ")?;
+        execute!(stdout, ResetColor)?;
+        stdout.flush()?;
+
+        loop {
+            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                match code {
+                    KeyCode::Char('y') => return Ok(true),
+                    KeyCode::Char('n') => return Ok(false),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn close(&mut self, stdout: &mut impl Write) -> io::Result<()> {
+        if self.modified {
+            if self.prompt_save(stdout)? {
+                self.save()?;
             }
         }
         Ok(())
