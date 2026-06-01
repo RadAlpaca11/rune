@@ -85,6 +85,9 @@ impl Editor {
     }
 
     fn move_cursor(&mut self, press: KeyCode) {
+        let line_idx = self.cursor_y as usize + self.scroll_y;
+        let line_len = self.buffer[line_idx].len();
+
         match press {
             KeyCode::Up => {
                 if self.cursor_y > 0 {
@@ -94,17 +97,19 @@ impl Editor {
                 }
             }
             KeyCode::Down => {
-                if self.cursor_y < self.window_height - 2 { 
-                    self.cursor_y += 1; 
-                } else {
-                    self.scroll_y += 1;
+                if self.cursor_y as usize + self.scroll_y < self.buffer.len() - 1 {
+                    if self.cursor_y < self.window_height - 2 { 
+                        self.cursor_y += 1; 
+                    } else {
+                        self.scroll_y += 1;
+                    }
                 }
             }
             KeyCode::Left => {
                 self.cursor_x = self.cursor_x.saturating_sub(1);
             }
             KeyCode::Right => {
-                if self.cursor_x < self.window_width - 1 { self.cursor_x += 1; }
+                if self.cursor_x < line_len as u16 { self.cursor_x += 1; }
             }
             _ => {}
         }
