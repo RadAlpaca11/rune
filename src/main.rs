@@ -43,7 +43,7 @@ impl Editor {
 
     fn load(&mut self, path: &str) -> io::Result<()> {
         let contents = std::fs::read_to_string(path)?;
-        self.buffer = contents.lines().map(|line| line.to_string()).collect();
+        self.buffer = contents.lines().map(|line: &str| line.to_string()).collect();
         Ok(())
     }
 
@@ -85,8 +85,6 @@ impl Editor {
     }
 
     fn move_cursor(&mut self, press: KeyCode) {
-        let line_idx = self.cursor_y as usize + self.scroll_y;
-        let line_len = self.buffer[line_idx].len();
 
         match press {
             KeyCode::Up => {
@@ -106,10 +104,24 @@ impl Editor {
                 }
             }
             KeyCode::Left => {
-                self.cursor_x = self.cursor_x.saturating_sub(1);
+                if self.cursor_x > 0 {
+                    self.cursor_x = self.cursor_x.saturating_sub(1);
+                } else if self.cursor_y > 0{
+                    self.move_cursor(KeyCode::Up);
+                    let line_idx = self.cursor_y as usize + self.scroll_y;
+                    let line_len = self.buffer[line_idx].len() as u16;
+                    self.cursor_x = line_len;
+                }
             }
             KeyCode::Right => {
-                if self.cursor_x < line_len as u16 { self.cursor_x += 1; }
+                let line_idx = self.cursor_y as usize + self.scroll_y;
+                let line_len = self.buffer[line_idx].len() as u16;
+                if self.cursor_x < line_len { 
+                    self.cursor_x += 1; 
+                } else {
+                    self.move_cursor(KeyCode::Down);
+                    self.cursor_x = 0;
+                }
             }
             _ => {}
         }
