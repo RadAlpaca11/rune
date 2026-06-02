@@ -1,7 +1,9 @@
 mod buffer;
+mod command;
 mod editor;
 mod render;
 mod selection;
+mod undo;
 
 use crossterm::{
     execute,

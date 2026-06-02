@@ -1,3 +1,4 @@
+use crate::command::Command;
 use crate::editor::Editor;
 use cli_clipboard::ClipboardProvider;
 use crossterm::event::KeyCode;
@@ -70,21 +71,47 @@ impl Editor {
 
         match key {
             KeyCode::Char(c) => {
+                self.undo_stack.push(Command::InsertChar {
+                    x: self.cursor_x as usize,
+                    y: line_idx,
+                    c,
+                });
+                self.redo_stack.clear();
                 self.buffer[line_idx].insert(self.cursor_x as usize, c);
                 self.cursor_x += 1;
             }
             KeyCode::Enter => {
-                let new_line = self.buffer[line_idx].split_off(self.cursor_x as usize);
+                self.undo_stack.push(Command::SplitLine {
+                    x: self.cursor_x as usize,
+                    y: line_idx,
+                });
+                self.redo_stack.clear();
+                let new_line: String = self.buffer[line_idx].split_off(self.cursor_x as usize);
                 self.buffer.insert(line_idx + 1, new_line);
                 self.cursor_x = 0;
                 self.cursor_y += 1;
             }
             KeyCode::Backspace => {
                 if self.cursor_x > 0 {
+                    let c = self.buffer[line_idx]
+                        .chars()
+                        .nth((self.cursor_x - 1) as usize)
+                        .unwrap();
+                    self.undo_stack.push(Command::DeleteChar {
+                        x: (self.cursor_x - 1) as usize,
+                        y: line_idx,
+                        c,
+                    });
+                    self.redo_stack.clear();
                     self.buffer[line_idx].remove((self.cursor_x - 1) as usize);
                     self.cursor_x -= 1;
                 } else if line_idx > 0 {
                     let prev_line_len = self.buffer[line_idx - 1].len() as u16;
+                    self.undo_stack.push(Command::MergeLine {
+                        y: line_idx - 1,
+                        prev_line_len: prev_line_len as usize,
+                    });
+                    self.redo_stack.clear();
                     let current_line = self.buffer.remove(line_idx);
                     self.buffer[line_idx - 1].push_str(&current_line);
                     self.cursor_x = prev_line_len;
@@ -92,6 +119,11 @@ impl Editor {
                 }
             }
             KeyCode::Tab => {
+                self.undo_stack.push(Command::InsertChar {
+                    x: self.cursor_x as usize,
+                    y: line_idx,
+                    c: '\t',
+                });
                 self.buffer[line_idx].insert_str(self.cursor_x as usize, &" ".repeat(4));
                 self.cursor_x += 4;
             }
@@ -102,6 +134,12 @@ impl Editor {
     pub fn delete_selection(&mut self) {
         if let Some(ref sel) = self.selection.clone() {
             let (start_x, start_y, end_x, end_y) = sel.normalize();
+            self.undo_stack.push(Command::DeleteSelection {
+                start_x: start_x as usize,
+                start_y,
+                text: sel.sel_string(&self.buffer),
+            });
+            self.redo_stack.clear();
 
             if start_y == end_y {
                 self.buffer[start_y].drain(start_x as usize..end_x as usize);

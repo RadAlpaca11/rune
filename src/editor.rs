@@ -1,13 +1,11 @@
+use crate::command::Command;
+use crate::selection::Selection;
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event::{self}, KeyCode, KeyEvent, KeyModifiers},
     terminal::{self},
 };
-
-use cli_clipboard::{ClipboardContext, ClipboardProvider};
-
 use std::io::{self, Write};
-
-use crate::selection::Selection;
 
 pub enum Mode {
     Viewing,
@@ -26,6 +24,8 @@ pub struct Editor {
     pub modified: bool,
     pub selection: Option<Selection>,
     pub clipboard: ClipboardContext,
+    pub undo_stack: Vec<Command>,
+    pub redo_stack: Vec<Command>,
 }
 
 impl Editor {
@@ -43,6 +43,8 @@ impl Editor {
             modified: false,
             selection: None,
             clipboard: ClipboardContext::new().unwrap(),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         }
     }
 
@@ -126,6 +128,8 @@ impl Editor {
                     (KeyCode::Char('s'), KeyModifiers::CONTROL) => self.save()?,
                     (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.copy_selection(),
                     (KeyCode::Char('v'), KeyModifiers::CONTROL) => self.paste(),
+                    (KeyCode::Char('z'), KeyModifiers::CONTROL) => self.undo(),
+                    (KeyCode::Char('y'), KeyModifiers::CONTROL) => self.redo(),
                     (KeyCode::Esc, KeyModifiers::NONE) => self.mode = Mode::Viewing,
                     (KeyCode::Char('i'), KeyModifiers::NONE)
                         if matches!(self.mode, Mode::Viewing) =>
