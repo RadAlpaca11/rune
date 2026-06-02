@@ -1,5 +1,6 @@
 mod buffer;
 mod editor;
+mod render;
 mod selection;
 
 use crossterm::{

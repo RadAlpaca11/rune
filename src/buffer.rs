@@ -1,5 +1,5 @@
 use crate::editor::Editor;
-use cli_clipboard:: ClipboardProvider;
+use cli_clipboard::ClipboardProvider;
 use crossterm::event::KeyCode;
 use std::io;
 
