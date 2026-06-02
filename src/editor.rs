@@ -144,6 +144,10 @@ impl Editor {
                 } else if self.scroll_y > 0 {
                     self.scroll_y -= 1;
                 }
+                let new_line_len = self.buffer[self.cursor_y as usize + self.scroll_y].len() as u16;
+                if self.cursor_x > new_line_len {
+                    self.cursor_x = new_line_len;
+                }
             }
             KeyCode::Down => {
                 if self.cursor_y as usize + self.scroll_y < self.buffer.len() - 1 {
@@ -152,6 +156,10 @@ impl Editor {
                     } else {
                         self.scroll_y += 1;
                     }
+                }
+                let new_line_len = self.buffer[self.cursor_y as usize + self.scroll_y].len() as u16;
+                if self.cursor_x > new_line_len {
+                    self.cursor_x = new_line_len;
                 }
             }
             KeyCode::Left => {
@@ -169,7 +177,7 @@ impl Editor {
                 let line_len = self.buffer[line_idx].len() as u16;
                 if self.cursor_x < line_len {
                     self.cursor_x += 1;
-                } else {
+                } else if line_idx < self.buffer.len() - 1{
                     self.move_cursor(KeyCode::Down);
                     self.cursor_x = 0;
                 }
