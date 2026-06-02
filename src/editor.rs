@@ -246,7 +246,7 @@ impl Editor {
                                 self.selection = None;
                                 self.move_cursor(code)
                             }
-                            _ => self.insert(code),
+                            _ => self.check_insert(code),
                         },
                     },
                 },

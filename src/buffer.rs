@@ -23,6 +23,24 @@ impl Editor {
         self.modified = false;
         Ok(())
     }
+
+    pub fn check_insert(&mut self, key: KeyCode) {
+        if self.selection.is_some() {
+            match key {
+                KeyCode::Backspace | KeyCode::Delete => {
+                    self.delete_selection();
+                }
+                KeyCode::Char(_) | KeyCode::Enter | KeyCode::Tab => {
+                    self.delete_selection();
+                    self.insert(key);
+                }
+                _ => {}
+            }
+        } else {
+            self.insert(key);
+        }
+    }
+
     pub fn insert(&mut self, key: KeyCode) {
         let line_idx = self.cursor_y as usize + self.scroll_y;
         self.modified = true;
@@ -55,6 +73,27 @@ impl Editor {
                 self.cursor_x += 4;
             }
             _ => {}
+        }
+    }
+
+    pub fn delete_selection(&mut self) {
+        if let Some(ref sel) = self.selection.clone() {
+            let (start_x, start_y, end_x, end_y) = sel.normalize();
+
+            if start_y == end_y {
+                self.buffer[start_y].drain(start_x as usize..end_x as usize);
+            } else {
+                self.buffer[start_y].drain(start_x as usize..);
+                self.buffer[end_y].drain(..end_x as usize);
+
+                self.buffer.drain(start_y + 1..end_y);
+                let last = self.buffer.remove(start_y + 1);
+                self.buffer[start_y].push_str(&last);
+            }
+            self.selection = None;
+            self.modified = true;
+            self.cursor_x = start_x;
+            self.cursor_y = (start_y - self.scroll_y) as u16;
         }
     }
 }

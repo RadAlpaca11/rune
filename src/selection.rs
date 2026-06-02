@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Selection {
     pub start_x: u16,
     pub start_y: usize,
