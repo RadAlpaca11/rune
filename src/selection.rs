@@ -11,7 +11,7 @@ impl Selection {
         if self.start_y < self.end_y {
             (self.start_x, self.start_y, self.end_x, self.end_y)
         } else if self.end_y < self.start_y {
-            (self.start_x, self.end_y, self.end_x, self.start_y)
+            (self.end_x, self.end_y, self.start_x, self.start_y)
         } else {
             if self.start_x <= self.end_x {
                 (self.start_x, self.start_y, self.end_x, self.end_y)

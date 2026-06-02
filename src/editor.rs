@@ -6,6 +6,8 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
+
 use std::io::{self, Write};
 
 use crate::selection::Selection;
@@ -31,6 +33,7 @@ pub struct Editor {
     pub path: String,
     pub modified: bool,
     pub selection: Option<Selection>,
+    pub clipboard: String,
 }
 
 impl Editor {
@@ -47,6 +50,7 @@ impl Editor {
             path: String::new(),
             modified: false,
             selection: None,
+            clipboard: String::new(),
         }
     }
 
@@ -197,11 +201,15 @@ impl Editor {
                 Event::Key(KeyEvent {
                     code, modifiers, ..
                 }) => match (code, modifiers) {
-                    (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                    (KeyCode::Char('q'), KeyModifiers::CONTROL) => {
                         self.close(stdout)?;
                         break;
                     }
                     (KeyCode::Char('s'), KeyModifiers::CONTROL) => self.save()?,
+                    (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                        self.clipboard = self.copy_selection()
+                    }
+                    (KeyCode::Char('v'), KeyModifiers::CONTROL) => self.paste_selection(),
                     (KeyCode::Esc, KeyModifiers::NONE) => self.mode = Mode::Viewing,
                     (KeyCode::Char('i'), KeyModifiers::NONE)
                         if matches!(self.mode, Mode::Viewing) =>
