@@ -1,6 +1,6 @@
 use crate::editor::Editor;
+use cli_clipboard:: ClipboardProvider;
 use crossterm::event::KeyCode;
-use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use std::io;
 
 impl Editor {
@@ -25,24 +25,25 @@ impl Editor {
         Ok(())
     }
 
-    pub fn copy_selection(&self) -> String {
+    pub fn copy_selection(&mut self) {
         if let Some(ref sel) = self.selection {
-            let (start_x, start_y, end_x, end_y) = sel.normalize();
-            if start_y == end_y {
-                self.buffer[start_y][start_x as usize..end_x as usize].to_string()
-            } else {
-                let mut result: String = String::new();
-                result.push_str(&self.buffer[start_y][start_x as usize..]);
-                result.push('\n');
-                for y in (start_y + 1)..end_y {
-                    result.push_str(&self.buffer[y]);
-                    result.push('\n');
+            let text = sel.sel_string(&self.buffer);
+            self.clipboard.set_contents(text).ok();
+        }
+    }
+
+    pub fn paste(&mut self) {
+        if self.selection.is_some() {
+            self.delete_selection();
+        }
+        if let Ok(text) = self.clipboard.get_contents() {
+            for c in text.chars() {
+                if c == '\n' {
+                    self.insert(KeyCode::Enter);
+                } else {
+                    self.insert(KeyCode::Char(c));
                 }
-                result.push_str(&self.buffer[end_y][..end_x as usize]);
-                result
             }
-        } else {
-            String::new()
         }
     }
 

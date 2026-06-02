@@ -33,7 +33,7 @@ pub struct Editor {
     pub path: String,
     pub modified: bool,
     pub selection: Option<Selection>,
-    pub clipboard: String,
+    pub clipboard: ClipboardContext,
 }
 
 impl Editor {
@@ -50,7 +50,7 @@ impl Editor {
             path: String::new(),
             modified: false,
             selection: None,
-            clipboard: String::new(),
+            clipboard: ClipboardContext::new().unwrap(),
         }
     }
 
@@ -206,10 +206,8 @@ impl Editor {
                         break;
                     }
                     (KeyCode::Char('s'), KeyModifiers::CONTROL) => self.save()?,
-                    (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                        self.clipboard = self.copy_selection()
-                    }
-                    (KeyCode::Char('v'), KeyModifiers::CONTROL) => self.paste_selection(),
+                    (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.copy_selection(),
+                    (KeyCode::Char('v'), KeyModifiers::CONTROL) => self.paste(),
                     (KeyCode::Esc, KeyModifiers::NONE) => self.mode = Mode::Viewing,
                     (KeyCode::Char('i'), KeyModifiers::NONE)
                         if matches!(self.mode, Mode::Viewing) =>
