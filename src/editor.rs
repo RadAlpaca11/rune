@@ -2,7 +2,11 @@ use crate::command::Command;
 use crate::selection::Selection;
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use crossterm::{
-    event::{self, Event::{self}, KeyCode, KeyEvent, KeyModifiers},
+    event::{
+        self,
+        Event::{self},
+        KeyCode, KeyEvent, KeyModifiers,
+    },
     terminal::{self},
 };
 use std::io::{self, Write};
@@ -26,6 +30,7 @@ pub struct Editor {
     pub clipboard: ClipboardContext,
     pub undo_stack: Vec<Command>,
     pub redo_stack: Vec<Command>,
+    pub skip_undo: bool,
 }
 
 impl Editor {
@@ -45,6 +50,7 @@ impl Editor {
             clipboard: ClipboardContext::new().unwrap(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            skip_undo: false,
         }
     }
 

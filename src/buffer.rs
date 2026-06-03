@@ -38,6 +38,15 @@ impl Editor {
             self.delete_selection();
         }
         if let Ok(text) = self.clipboard.get_contents() {
+            let x = self.cursor_x as usize;
+            let y = self.cursor_y as usize + self.scroll_y;
+            self.undo_stack.push(Command::InsertStr {
+                x,
+                y,
+                text: text.clone(),
+            });
+            self.redo_stack.clear();
+            self.skip_undo = true;
             for c in text.chars() {
                 if c == '\n' {
                     self.insert(KeyCode::Enter);
@@ -65,27 +74,31 @@ impl Editor {
         }
     }
 
+    pub fn push_undo(&mut self, command: Command) {
+        if !self.skip_undo {
+            self.undo_stack.push(command);
+            self.redo_stack.clear();
+        }
+    }
+
     pub fn insert(&mut self, key: KeyCode) {
         let line_idx = self.cursor_y as usize + self.scroll_y;
         self.modified = true;
-
         match key {
             KeyCode::Char(c) => {
-                self.undo_stack.push(Command::InsertChar {
+                self.push_undo(Command::InsertChar {
                     x: self.cursor_x as usize,
                     y: line_idx,
                     c,
                 });
-                self.redo_stack.clear();
                 self.buffer[line_idx].insert(self.cursor_x as usize, c);
                 self.cursor_x += 1;
             }
             KeyCode::Enter => {
-                self.undo_stack.push(Command::SplitLine {
+                self.push_undo(Command::SplitLine {
                     x: self.cursor_x as usize,
                     y: line_idx,
                 });
-                self.redo_stack.clear();
                 let new_line: String = self.buffer[line_idx].split_off(self.cursor_x as usize);
                 self.buffer.insert(line_idx + 1, new_line);
                 self.cursor_x = 0;
@@ -97,21 +110,19 @@ impl Editor {
                         .chars()
                         .nth((self.cursor_x - 1) as usize)
                         .unwrap();
-                    self.undo_stack.push(Command::DeleteChar {
+                    self.push_undo(Command::DeleteChar {
                         x: (self.cursor_x - 1) as usize,
                         y: line_idx,
                         c,
                     });
-                    self.redo_stack.clear();
                     self.buffer[line_idx].remove((self.cursor_x - 1) as usize);
                     self.cursor_x -= 1;
                 } else if line_idx > 0 {
                     let prev_line_len = self.buffer[line_idx - 1].len() as u16;
-                    self.undo_stack.push(Command::MergeLine {
+                    self.push_undo(Command::MergeLine {
                         y: line_idx - 1,
                         prev_line_len: prev_line_len as usize,
                     });
-                    self.redo_stack.clear();
                     let current_line = self.buffer.remove(line_idx);
                     self.buffer[line_idx - 1].push_str(&current_line);
                     self.cursor_x = prev_line_len;
@@ -119,7 +130,7 @@ impl Editor {
                 }
             }
             KeyCode::Tab => {
-                self.undo_stack.push(Command::InsertChar {
+                self.push_undo(Command::InsertChar {
                     x: self.cursor_x as usize,
                     y: line_idx,
                     c: '\t',
@@ -134,12 +145,11 @@ impl Editor {
     pub fn delete_selection(&mut self) {
         if let Some(ref sel) = self.selection.clone() {
             let (start_x, start_y, end_x, end_y) = sel.normalize();
-            self.undo_stack.push(Command::DeleteSelection {
+            self.push_undo(Command::DeleteSelection {
                 start_x: start_x as usize,
                 start_y,
                 text: sel.sel_string(&self.buffer),
             });
-            self.redo_stack.clear();
 
             if start_y == end_y {
                 self.buffer[start_y].drain(start_x as usize..end_x as usize);

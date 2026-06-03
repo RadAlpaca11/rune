@@ -1,3 +1,4 @@
+use crate::editor::{Editor, Mode};
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent},
@@ -6,7 +7,6 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use std::io::{self, Write};
-use crate::editor::{Editor, Mode};
 
 const COLOR_PRI: Color = Color::White;
 const COLOR_SEC: Color = Color::Black;
@@ -14,7 +14,6 @@ const COLOR_ERR: Color = Color::Red;
 const COLOR_HIL: Color = Color::Magenta;
 
 impl Editor {
-
     pub fn draw(&self, stdout: &mut impl Write) -> io::Result<()> {
         execute!(stdout, terminal::Clear(ClearType::All))?;
 
