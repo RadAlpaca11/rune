@@ -81,7 +81,7 @@ impl Editor {
 
         let status = format!(
             "x: {}, y: {}  MODE:{}  FILE:{}   {}",
-            self.cursor_x, self.cursor_y, mode_str, self.path, modified_str
+            self.cursor_x + 1, self.cursor_y + 1, mode_str, self.path, modified_str
         );
         let padding = " ".repeat((self.window_width as usize).saturating_sub(status.len()));
 
@@ -95,6 +95,7 @@ impl Editor {
         stdout.flush()?;
         Ok(())
     }
+
     pub fn prompt_save(&mut self, stdout: &mut impl Write) -> io::Result<bool> {
         execute!(
             stdout,
